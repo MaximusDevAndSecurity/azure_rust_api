@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 use diesel::prelude::*;
 use diesel::mysql::MysqlConnection;
 use diesel::r2d2::{self, ConnectionManager};
+use bcrypt::{hash, DEFAULT_COST};
 
 
 #[macro_use]
@@ -21,12 +22,19 @@ struct User {
     password_hash: String,
 }
 
-#[derive(Serialize, Deserialize, Insertable)]
-#[table_name = "users"]
+#[derive(Serialize, Deserialize)]
 struct NewUser {
+    username: String,
+    password: String, // Plaintext password
+}
+
+#[derive(Insertable)]
+#[table_name = "users"]
+struct UserForInsert {
     username: String,
     password_hash: String,
 }
+
 
 
 pub type DbPool = r2d2::Pool<ConnectionManager<MysqlConnection>>;
@@ -68,16 +76,32 @@ async fn create_user(
 ) -> Result<HttpResponse, actix_web::Error> {
     let conn = pool.get().expect("couldn't get db connection from pool");
 
-    let new_user = web::block(move || {
+    // Hash the plaintext password
+    let hashed_password = bcrypt::hash(&user_data.password, DEFAULT_COST)
+        .expect("Failed to hash password");
+
+    // Create an instance for insertion, with the hashed password
+    let user_for_insert = UserForInsert {
+        username: user_data.username.clone(),
+        password_hash: hashed_password,
+    };
+
+    // Insert the user into the database
+    let new_user_result = web::block(move || {
         diesel::insert_into(users)
-            .values(&user_data.into_inner())
+            .values(&user_for_insert)
             .execute(&conn)
     })
     .await
-    .map_err(|_| actix_web::error::ErrorInternalServerError("Error inserting user"))?;
+    .map_err(|_| actix_web::error::ErrorInternalServerError("Error inserting user"));
 
-    Ok(HttpResponse::Ok().json("User created successfully"))
+    match new_user_result {
+        Ok(_) => Ok(HttpResponse::Ok().json("User created successfully")),
+        Err(e) => Err(e),
+    }
 }
+
+
 
 #[delete("/users/{id}")]
 async fn delete_user(
