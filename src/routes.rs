@@ -3,12 +3,13 @@ use crate::models::{DbPool, User, NewUser, UserForInsert};
 use diesel::prelude::*;
 use bcrypt::DEFAULT_COST;
 use crate::schema::users::dsl::*;
-
+use crate::auth::{create_token};
 
 pub fn config_services(cfg: &mut web::ServiceConfig) {
     cfg.service(get_user);
     cfg.service(create_user);
     cfg.service(delete_user);
+    cfg.service(login);
     // other routes here
 }
 
@@ -84,5 +85,32 @@ async fn delete_user(
         Ok(count) if count > 0 => Ok(HttpResponse::Ok().json("User deleted")),
         Ok(_) => Ok(HttpResponse::NotFound().json("User not found")),
         Err(_) => Err(actix_web::error::ErrorInternalServerError("Internal Server Error")),
+    }
+}
+
+#[post("/login")]
+async fn login(user_data: web::Json<NewUser>, pool: web::Data<DbPool>) -> HttpResponse {
+    use diesel::prelude::*;
+
+    let conn = pool.get().expect("couldn't get db connection from pool");
+
+    // Find the user by username
+    let user = users
+        .filter(username.eq(&user_data.username))
+        .first::<User>(&conn);
+
+    match user {
+        Ok(u) => {
+            // Verify password (ensure passwords are hashed in the database)
+            if bcrypt::verify(&user_data.password, &u.password_hash).unwrap_or(false) {
+                // Passwords match, proceed to create token
+                let token = create_token(&u.username);  // Assuming create_token returns a String
+                HttpResponse::Ok().json({"token" ; token})
+            } else {
+                // Passwords do not match
+                HttpResponse::Unauthorized().body("Invalid username or password")
+            }
+        }
+        Err(_) => HttpResponse::Unauthorized().body("Invalid username or password"),
     }
 }

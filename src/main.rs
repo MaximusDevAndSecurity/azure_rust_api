@@ -1,12 +1,16 @@
 mod models;
 mod routes;
 mod schema;
+mod auth;
+mod middleware;
+
 
 use actix_web::{App, HttpServer, web};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::MysqlConnection;
 use routes::config_services;
 use models::DbPool;
+use crate::middleware::JwtValidator;
 
 #[macro_use]
 extern crate diesel;
@@ -26,6 +30,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(JwtValidator) // Apply middleware
             .app_data(web::Data::new(pool.clone()))
             .configure(config_services)
     })
