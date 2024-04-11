@@ -8,9 +8,11 @@ mod middleware;
 use actix_web::{App, HttpServer, web};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::MysqlConnection;
-use routes::config_services;
+use routes::{config_auth_routes, config_public_routes};
 use models::DbPool;
 use crate::middleware::JwtValidator;
+use actix_web::middleware::Logger;
+
 
 #[macro_use]
 extern crate diesel;
@@ -26,13 +28,20 @@ pub fn establish_connection() -> DbPool {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init();
+    println!("Starting server...");
     let pool = establish_connection();
 
     HttpServer::new(move || {
         App::new()
-            .wrap(JwtValidator) // Apply middleware
-            .app_data(web::Data::new(pool.clone()))
-            .configure(config_services)
+            .wrap(Logger::default())
+            .app_data(web::Data::new(pool.clone())) // Provide pool to all routes
+            .configure(config_public_routes) // Public routes (no JWT validation)
+            .service(
+                web::scope("/api") // Routes requiring authentication
+                    .wrap(JwtValidator)
+                    .configure(config_auth_routes)
+            )
     })
     .bind("127.0.0.1:3000")?
     .run()

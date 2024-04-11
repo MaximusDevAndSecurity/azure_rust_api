@@ -15,7 +15,7 @@ pub fn create_token(username: &str) -> String {
         .timestamp() as usize;
 
     let claims = Claims { sub: username.to_owned(), exp: expiration };
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key_bytes)).unwrap() // Use byte slice here
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key_bytes)).unwrap() // Use byte slice here: reminder
 }
 
 

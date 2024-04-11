@@ -3,14 +3,20 @@ use crate::models::{DbPool, User, NewUser, UserForInsert};
 use diesel::prelude::*;
 use bcrypt::DEFAULT_COST;
 use crate::schema::users::dsl::*;
-use crate::auth::{create_token};
+use crate::auth::create_token;
+use log::{error, warn, info, debug};
 
-pub fn config_services(cfg: &mut web::ServiceConfig) {
+
+pub fn config_auth_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_user);
     cfg.service(create_user);
     cfg.service(delete_user);
+    // Add other authenticated routes here
+}
+
+pub fn config_public_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(login);
-    // other routes here
+    // Add other public routes here
 }
 
 #[get("/users/{id}")]
@@ -88,9 +94,9 @@ async fn delete_user(
     }
 }
 
+
 #[post("/login")]
 async fn login(user_data: web::Json<NewUser>, pool: web::Data<DbPool>) -> HttpResponse {
-    use diesel::prelude::*;
 
     let conn = pool.get().expect("couldn't get db connection from pool");
 
