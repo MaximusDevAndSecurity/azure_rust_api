@@ -28,6 +28,8 @@ pub fn establish_connection() -> DbPool {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenv::dotenv().ok();
+    let server_url = std::env::var("SERVER_URL").expect("server url must be set");
     env_logger::init();
     println!("Starting server...");
     let pool = establish_connection();
@@ -43,7 +45,8 @@ async fn main() -> std::io::Result<()> {
                     .configure(config_auth_routes)
             )
     })
-    .bind("127.0.0.1:3000")?
+    .bind(server_url)?
     .run()
     .await
 }
+

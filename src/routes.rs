@@ -4,18 +4,18 @@ use diesel::prelude::*;
 use bcrypt::DEFAULT_COST;
 use crate::schema::users::dsl::*;
 use crate::auth::create_token;
-use log::{error, warn, info, debug};
+
 
 
 pub fn config_auth_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_user);
-    cfg.service(create_user);
     cfg.service(delete_user);
     // Add other authenticated routes here
 }
 
 pub fn config_public_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(login);
+    cfg.service(create_user);
     // Add other public routes here
 }
 
@@ -39,7 +39,7 @@ async fn get_user(
     }
 }
 
-#[post("/users")]
+#[post("/register")]
 async fn create_user(
     user_data: web::Json<NewUser>,
     pool: web::Data<DbPool>,
