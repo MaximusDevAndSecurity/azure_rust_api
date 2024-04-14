@@ -2,21 +2,23 @@ use actix_web::{web, HttpResponse, get, post, delete};
 use crate::models::{DbPool, User, NewUser, UserForInsert};
 use diesel::prelude::*;
 use bcrypt::DEFAULT_COST;
-use crate::schema::users::dsl::*;
 use crate::auth::create_token;
-
+use crate::diesel::associations::HasTable;
+use diesel::insert_into;
+use crate::schema::users::dsl::*;
+use crate::schema::users::dsl::users;  
 
 
 pub fn config_auth_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_user);
     cfg.service(delete_user);
-    // Add other authenticated routes here
+    
 }
 
 pub fn config_public_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(login);
     cfg.service(create_user);
-    // Add other public routes here
+    // other public routes here
 }
 
 #[get("/users/{id}")]
@@ -44,32 +46,33 @@ async fn create_user(
     user_data: web::Json<NewUser>,
     pool: web::Data<DbPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let conn = pool.get().expect("couldn't get db connection from pool");
+    let conn = pool.get().map_err(|_| actix_web::error::ErrorInternalServerError("Failed to get DB connection from pool"))?;
 
-    // Hash the plaintext password
     let hashed_password = bcrypt::hash(&user_data.password, DEFAULT_COST)
-        .expect("Failed to hash password");
+        .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to hash password"))?;
 
-    // Create an instance for insertion, with the hashed password
     let user_for_insert = UserForInsert {
         username: user_data.username.clone(),
         password_hash: hashed_password,
     };
 
-    // Insert the user into the database
-    let new_user_result = web::block(move || {
-        diesel::insert_into(users)
-            .values(&user_for_insert)
-            .execute(&conn)
+    let result = web::block(move || {
+        insert_into(users)  
+    .values(&user_for_insert)
+    .execute(&conn)
     })
     .await
-    .map_err(|_| actix_web::error::ErrorInternalServerError("Error inserting user"));
+    .map_err(|_| actix_web::error::ErrorInternalServerError("Error inserting user into database"))?;
 
-    match new_user_result {
-        Ok(_) => Ok(HttpResponse::Ok().json("User created successfully")),
-        Err(e) => Err(e),
+    match result {
+        Ok(count) if count > 0 => Ok(HttpResponse::Created().json("User created successfully")),
+        Ok(_) => Err(actix_web::error::ErrorInternalServerError("No user was created")),
+        Err(e) => Err(actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))),
     }
 }
+
+
+
 
 
 

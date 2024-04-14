@@ -24,6 +24,7 @@ pub struct UserForInsert {
     pub password_hash: String,
 }
 
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
   pub  sub: String,
