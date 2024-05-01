@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  api:
+    build: .
+    image: my_rust_api_image:latest
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: mysql://root:password@db:3306/users
+      SECRET_KEY: VerySecretString
+      SERVER_URL: 0.0.0.0:3000
+    depends_on:
+      - db
+  db:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: users
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+volumes:
+  db-data:
